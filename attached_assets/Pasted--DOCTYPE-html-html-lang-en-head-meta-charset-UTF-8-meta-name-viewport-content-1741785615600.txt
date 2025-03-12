@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spinning Cube with WebGL</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+
+<canvas id="webgl-canvas"></canvas>
+
+<script>
+    // Get the WebGL context
+    const canvas = document.getElementById("webgl-canvas");
+    const gl = canvas.getContext("webgl");
+
+    if (!gl) {
+        console.log("WebGL not supported, falling back on experimental-webgl");
+        gl = canvas.getContext("experimental-webgl");
+    }
+
+    if (!gl) {
+        alert("Your browser does not support WebGL");
+    }
+
+    // Set the size of the canvas
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Vertex shader program
+    const vsSource = `
+        attribute vec4 a_position;
+        uniform mat4 u_modelViewMatrix;
+        uniform mat4 u_projectionMatrix;
+        void main() {
+            gl_Position = u_projectionMatrix * u_modelViewMatrix * a_position;
+        }
+    `;
+
+    // Fragment shader program
+    const fsSource = `
+        precision mediump float;
+        void main() {
+            gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0); // Green color
+        }
+    `;
+
+    // Compile shader
+    function compileShader(source, type) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error("ERROR compiling shader!", gl.getShaderInfoLog(shader));
+        }
+
+        return shader;
+    }
+
+    // Create shader program
+    const vertexShader = compileShader(vsSource, gl.VERTEX_SHADER);
+    const fragmentShader = compileShader(fsSource, gl.FRAGMENT_SHADER);
+
+    const shaderProgram = gl.createProgram();
+    gl.attachShader(shaderProgram, vertexShader);
+    gl.attachShader(shaderProgram, fragmentShader);
+    gl.linkProgram(shaderProgram);
+
+    if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+        console.error("ERROR linking program!", gl.getProgramInfoLog(shaderProgram));
+    }
+
+    gl.useProgram(shaderProgram);
+
+    // Define cube vertices (8 vertices for a cube)
+    const vertices = new Float32Array([
+        -1, -1, -1,
+         1, -1, -1,
+         1,  1, -1,
+        -1,  1, -1,
+        -1, -1,  1,
+         1, -1,  1,
+         1,  1,  1,
+        -1,  1,  1,
+    ]);
+
+    // Define indices for the cube's faces
+    const indices = new Uint16Array([
+        0, 1, 2, 0, 2, 3,   // front
+        4, 5, 6, 4, 6, 7,   // back
+        0, 1, 5, 0, 5, 4,   // bottom
+        2, 3, 7, 2, 7, 6,   // top
+        0, 3, 7, 0, 7, 4,   // left
+        1, 2, 6, 1, 6, 5    // right
+    ]);
+
+    // Create vertex buffer and load the cube vertices
+    const vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    // Create index buffer and load the indices
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+    // Get attribute and uniform locations
+    const positionLocation = gl.getAttribLocation(shaderProgram, "a_position");
+    const modelViewMatrixLocation = gl.getUniformLocation(shaderProgram, "u_modelViewMatrix");
+    const projectionMatrixLocation = gl.getUniformLocation(shaderProgram, "u_projectionMatrix");
+
+    // Enable the position attribute
+    gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(positionLocation);
+
+    // Set up projection matrix (perspective)
+    const fov = 45 * Math.PI / 180; // 45 degrees in radians
+    const aspect = canvas.width / canvas.height;
+    const near = 0.1;
+    const far = 100;
+    const projectionMatrix = new Float32Array(16);
+    mat4.perspective(projectionMatrix, fov, aspect, near, far);
+    gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix);
+
+    // Animation loop
+    let rotation = 0;
+    function animate() {
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.DEPTH_TEST);
+        
+        // Create model view matrix (camera)
+        const modelViewMatrix = new Float32Array(16);
+        mat4.identity(modelViewMatrix);
+        mat4.translate(modelViewMatrix, modelViewMatrix, [0, 0, -6]); // Move back to see the cube
+        mat4.rotate(modelViewMatrix, modelViewMatrix, rotation, [1, 1, 0]); // Rotate the cube
+
+        gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix);
+
+        // Draw the cube
+        gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+        // Update rotation
+        rotation += 0.01;
+
+        // Continue the animation
+        requestAnimationFrame(animate);
+    }
+
+    // Start the animation
+    animate();
+</script>
+
+<!-- Include a library for matrix transformations -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.4.0/gl-matrix.js"></script>
+
+</body>
+</html>
